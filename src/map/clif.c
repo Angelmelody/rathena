@@ -17596,7 +17596,7 @@ void clif_parse_client_version(int fd, struct map_session_data *sd) {
 /// Ranking list
 
 /// ranking pointlist  { <name>.24B <point>.L }*10
-void clif_sub_ranklist(unsigned char *buf,int idx,struct map_session_data* sd, int16 rankingtype){
+void clif_sub_ranklist(unsigned char *buf,int idx,struct map_session_data* sd, enum e_rank rankingtype){
 	struct fame_list* list;
 	int i, size = MAX_FAME_LIST;
 
@@ -17638,28 +17638,28 @@ void clif_sub_ranklist(unsigned char *buf,int idx,struct map_session_data* sd, i
 /// /blacksmith command sends this packet to the server.
 /// 0217 (CZ_BLACKSMITH_RANK)
 void clif_parse_Blacksmith( int fd, struct map_session_data *sd ){
-	clif_ranklist(sd,0);
+	clif_ranklist(sd,RANK_BLACKSMITH);
 }
 
 /// Request for the alchemist ranklist.
 /// /alchemist command sends this packet to the server.
 /// 0218 (CZ_ALCHEMIST_RANK)
 void clif_parse_Alchemist( int fd, struct map_session_data *sd ){
-	clif_ranklist(sd,1);
+	clif_ranklist(sd,RANK_ALCHEMIST);
 }
 
 /// Request for the taekwon ranklist.
 /// /taekwon command sends this packet to the server.
 /// 0225 (CZ_TAEKWON_RANK)
 void clif_parse_Taekwon( int fd, struct map_session_data *sd ){
-	clif_ranklist(sd,2);
+	clif_ranklist(sd,RANK_TAEKWON);
 }
 
 /// Request for the killer ranklist.
 /// /pk command sends this packet to the server.
 /// 0237 (CZ_KILLER_RANK)
 void clif_parse_RankingPk( int fd, struct map_session_data *sd ){
-	clif_ranklist(sd,3);
+	clif_ranklist(sd,RANK_KILLER);
 }
 
 /// 0219 { <name>.24B }*10 { <point>.L }*10 (ZC_BLACKSMITH_RANK)
@@ -17668,6 +17668,8 @@ void clif_parse_RankingPk( int fd, struct map_session_data *sd ){
 /// 0238 { <name>.24B }*10 { <point>.L }*10 (ZC_KILLER_RANK)
 /// 097d <RankingType>.W {<CharName>.24B <point>L}*10 <mypoint>L (ZC_ACK_RANKING)
 void clif_ranklist(struct map_session_data *sd, int16 rankingType) {
+	enum e_rank rank;
+
 #if PACKETVER < 20130710
 	unsigned char buf[MAX_FAME_LIST * sizeof(struct fame_list)+2];
 	short cmd;
@@ -17682,17 +17684,34 @@ void clif_ranklist(struct map_session_data *sd, int16 rankingType) {
 			return;
 	}
 
+	// Can be safely casted here, since we validated it before
+	rank = (enum e_rank)rankingType;
+
 	WBUFW(buf,0) = cmd;
-	clif_sub_ranklist(buf,2,sd,rankingType);
+	clif_sub_ranklist(buf,2,sd,rank);
 
 	clif_send(buf, packet_len(cmd), &sd->bl, SELF);
 #else
 	unsigned char buf[MAX_FAME_LIST * sizeof(struct fame_list)+8];
 	int mypoint = 0;
 
+	switch( rankingType ){
+		case RANK_BLACKSMITH:
+		case RANK_ALCHEMIST:
+		case RANK_TAEKWON:
+		case RANK_KILLER:
+			break;
+		default:
+			ShowError( "clif_ranklist: Unsupported ranking type '%d'. Please report this.\n", rankingType );
+			return;
+	}
+
+	// Can be safely casted here, since we validated it before
+	rank = (enum e_rank)rankingType;
+
 	WBUFW(buf,0) = 0x97d;
-	WBUFW(buf,2) = rankingType;
-	clif_sub_ranklist(buf,4,sd,rankingType);
+	WBUFW(buf,2) = rank;
+	clif_sub_ranklist(buf,4,sd,rank);
 
 	switch(sd->class_&MAPID_UPPERMASK){ //mypoint (checking if valid type)
 		case MAPID_BLACKSMITH:
